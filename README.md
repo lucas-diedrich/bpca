@@ -49,9 +49,9 @@ This package implements the algorithm proposed by Bishope, 1998. **Please cite t
 
 > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
 
-If you find this implementation useful, consider giving it a star on GitHub and cite this implementation
+If you find this implementation useful, consider giving it a star on GitHub and [cite this implementation](CITATION.cff)
 
-
+> Diedrich, L. bpca [Computer software]. https://github.com/lucas-diedrich/bpca.git
 
 [uv]: https://github.com/astral-sh/uv
 [scverse discourse]: https://discourse.scverse.org/
