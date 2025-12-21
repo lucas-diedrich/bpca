@@ -45,13 +45,19 @@ If you found a bug, please use the [issue tracker][].
 
 ## Citation
 
-> t.b.a
+This package implements the algorithm proposed by Bishope, 1998. **Please cite the original authors**
+
+> Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+
+If you find this implementation useful, consider giving it a star on GitHub and cite this implementation
+
+
 
 [uv]: https://github.com/astral-sh/uv
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/lucas-diedrich/bpca/issues
 [tests]: https://github.com/lucas-diedrich/bpca/actions/workflows/test.yaml
 [documentation]: https://bpca.readthedocs.io
-[changelog]: https://bpca.readthedocs.io/en/latest/changelog.html
+[changelog]: https://github.com/lucas-diedrich/bpca/releases
 [api documentation]: https://bpca.readthedocs.io/en/latest/api.html
 [pypi]: https://pypi.org/project/bpca
