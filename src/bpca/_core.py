@@ -1,6 +1,7 @@
 """Core algorithm"""
 
 import warnings
+from typing import Literal
 
 import numpy as np
 
@@ -49,8 +50,16 @@ class BPCAFit:
     Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
     """
 
+    _INIT_W_OPTIONS = ("svd", "random")
+
     def __init__(
-        self, X: np.ndarray, alpha: float = 1, sigma2: float = 1.0, max_iter: int = 1000, tol: float = 1e-6
+        self,
+        X: np.ndarray,
+        alpha: float = 1,
+        sigma2: float = 1.0,
+        max_iter: int = 1000,
+        tol: float = 1e-6,
+        init_w: Literal["svd", "random"] = "random",
     ) -> None:
         """Initialize Fit
 
@@ -67,11 +76,15 @@ class BPCAFit:
         tol
             Convergence tolerance
         """
+        if init_w not in self._INIT_W_OPTIONS:
+            raise ValueError(f"init_w must be one of {self._INIT_W_OPTIONS}, not {init_w}")
+
         self.X = X
 
         # Parameters
         self.alpha = alpha
         self.sigma2 = sigma2
+        self.init_w = init_w
         self._initialize_parameters()
 
         # Fitting parameters
@@ -89,14 +102,43 @@ class BPCAFit:
         self.n_var, self.n_obs = self.X.shape
         self.n_latent = self.n_var - 1
 
-        self.w = np.random.rand(self.n_var, self.n_latent)  # (n_features, n_latent)
         self.z = None
         self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features,)
         self.var = self.sigma2 * np.eye(self.n_latent)  # (n_latent, n_latent)
 
         self.Xt = self.X - self.mu
+        self.w = (
+            np.random.rand(self.n_var, self.n_latent)
+            if self.init_w == "random"
+            else self._svd_initialize_w(x=self.Xt, n_latent=self.n_latent)
+        )  # (n_features, n_latent)
 
-        self.alpha = self.n_var / np.square(np.linalg.norm(self.w, axis=0))  # (n_latent,)
+        self.alpha = np.random.rand(self.n_latent)  # (n_latent,)
+
+    def _impute_missing(self, x: np.ndarray) -> np.ndarray:
+        """Impute missing values with feature-wise median"""
+        missing_mask = np.isnan(x)
+        if not missing_mask.any():
+            return x
+
+        # Compute feature-wise median (ignoring NaN)
+        feature_medians = np.nanmedian(x, axis=1, keepdims=True)
+
+        # Impute missing values
+        return np.where(missing_mask, feature_medians, x)
+
+    def _svd_initialize_w(self, x: np.ndarray, n_latent: int) -> np.ndarray:
+        """SVD initialize data
+
+        Parameters
+        ----------
+        x
+            (n_obs, n_var)
+        """
+        x = self._impute_missing(x)
+        U, S, _ = np.linalg.svd(x.T, full_matrices=False)
+
+        return U.T[:, :n_latent] * S.T[:n_latent]  # or just U[:, :q]
 
     def fit(self):
         """Fit model"""
