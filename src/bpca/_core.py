@@ -155,7 +155,7 @@ class BPCAFit:
             np.divide(
                 2 * self.GAMMA_ALPHA0 + self.n_var,
                 self.tau * np.sum(np.square(self.weights), axis=0) + 2 * self.GAMMA_ALPHA0 / self.GAMMA_BETA0,
-            )  # n_latent
+            )  # (n_latent, )
         )
 
     def _pca(self, X: np.ndarray, n_latent: int, strategy: str = "zero") -> tuple[np.ndarray, float]:

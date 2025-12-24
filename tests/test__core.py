@@ -7,6 +7,8 @@ from bpca._core import BPCAFit
 
 
 class TestBPCAFitInit:
+    """Test parameter initialization"""
+
     @pytest.fixture
     def array(self) -> tuple[np.ndarray, np.ndarray]:
         """(n_obs = 4, n_var=3) array and feature-wise mean"""
@@ -14,8 +16,8 @@ class TestBPCAFitInit:
 
     @pytest.mark.parametrize(
         ("n_latent", "expected_n_latent"),
-        [(None, 2), (2, 2), (4, 3)],
-        ids=("None", "n_latent-limiting", "n_var-limiting"),
+        [(None, 2), (2, 2), (4, 3), (10, 3)],
+        ids=("None", "n_latent-limiting", "n_var-limiting", "larger-than-possible"),
     )
     def test_bpcafit_init_em_parameters(self, array: np.ndarray, n_latent: int | None, expected_n_latent: int) -> None:
         X, mean = array
@@ -34,6 +36,7 @@ class TestBPCAFitInit:
         assert bpca.weights.shape == (X.shape[1], expected_n_latent)
         assert (bpca.tau >= 1e-10) & (bpca.tau <= 1e10)
         assert bpca.alpha.shape == (expected_n_latent,)
+        assert np.array_equal(bpca.var, np.eye(expected_n_latent))
 
     @pytest.mark.parametrize("tolerance", [1e-3, 0.1, 1])
     @pytest.mark.parametrize("max_iter", [1, 100, 1000])
