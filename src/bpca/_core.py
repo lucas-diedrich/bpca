@@ -117,7 +117,7 @@ class BPCAFit:
             - Number of latent dimensions `n_latent`
             - mean `mu`
             - mean-centered data `Xt`
-            - Latent variable `z`
+            - Latent representation `z`
             - loadings `weights`
             - unexplained variance matrix `var`
             - ARD prior `alpha`
@@ -142,12 +142,19 @@ class BPCAFit:
             )
         self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is not None else X.shape[1] - 1
 
-        self.mu = np.nanmean(self.X, axis=0, keepdims=True)  # (n_features, 1)
+        self.nan_mask = np.isnan(X)  # (n_obs, n_var)
+        self.complete_obs_idx = np.where(~self.nan_mask.any(axis=1))[0]
+        self.incomplete_obs_idx = np.where(self.nan_mask.any(axis=1))[0]
+
+        self.mu = np.nanmean(self.X, axis=0, keepdims=True)  # (1, n_var)
         self.Xt = X - self.mu
+
+        # Initialize imputed data estimate (updated during E-step)
+        self.X_imputed = np.where(self.nan_mask, 0, X)
 
         self.z = None
         self.weights, residual_variance = self._pca(X=self.Xt, n_latent=self.n_latent)  # (n_features, n_latent), float
-        self.tau = 1 / np.clip(residual_variance, self.MIN_RESIDUAL_VARIANCE, self.MAX_RESIDUAL_VARIANCE)
+        self.tau: float = 1 / np.clip(residual_variance, self.MIN_RESIDUAL_VARIANCE, self.MAX_RESIDUAL_VARIANCE)
 
         self.var = np.eye(self.n_latent)  # (n_latent, n_latent)
 
@@ -171,7 +178,7 @@ class BPCAFit:
         Returns
         -------
         weights, residual_variance
-            - Weights (n_features, n_latent)
+            - Weights (n_latent, n_features)
             - Residual unexplained variance by SVD
         """
         X = _impute_missing(X, strategy=strategy)
@@ -204,7 +211,7 @@ class BPCAFit:
         converged = False
 
         tolgap = ...
-        zn = ...
+        z = ...
         weights = ...
 
         for n_iter in range(self.max_iter):  # noqa: B007
@@ -219,28 +226,120 @@ class BPCAFit:
             warnings.warn(f"Algorithm did not converge after {self.max_iter} steps", ConvergenceWarning, stacklevel=2)
 
         # Store final latent representation
-        self.z = zn
+        self.z = z
         self.weights = weights
 
         self._converged = converged
         self._n_iter = n_iter + 1
         self._is_fit = True
 
-    def _e_step(self, M: np.ndarray) -> np.ndarray:
+    def _e_step(self) -> tuple[np.ndarray, np.ndarray, float]:
         r"""Expectation step
 
-        Computes the posterior mean of the latent variables z.
-
-        Parameters
-        ----------
-        M : np.ndarray
-            Precision matrix :math:`W^T W + \sigma^2 I` of shape (n_latent, n_latent)
+        Computes the posterior mean of the latent variables z and sufficient
+        statistics for the M-step.
 
         Returns
         -------
-        zn : np.ndarray
-            Posterior mean :math:`E[z|x]` of shape (n_latent, n_obs)
+        scores : np.ndarray
+            Posterior mean E[z|x] of shape (n_obs, n_latent)
+        T : np.ndarray
+            Cross-covariance sufficient statistic of shape (n_var, n_latent)
+        trS : float
+            Sum of squared residuals sufficient statistic
         """
+        # Initialize scores matrix
+        scores = np.full((self.n_obs, self.n_latent), np.nan)
+
+        # Posterior precision matrix p(z|x) - shared for all complete observations
+        # R line 19: Rx <- diag(M$comps) + M$tau * t(M$PA) %*% M$PA + M$SigW
+        Rx = np.eye(self.n_latent) + self.tau * self.weights.T @ self.weights + self.var
+        Rx_inv = np.linalg.inv(Rx)
+
+        # --- E-step for complete observations (R lines 23-37) ---
+        if len(self.complete_obs_idx) > 0:
+            # Centered data for complete observations: (n_complete, n_var)
+            # R line 27: dy <- y[idx,, drop=FALSE] - repmat(M$mean, length(idx), 1)
+            dy_complete = self.Xt[self.complete_obs_idx, :]
+
+            # Posterior mean of z: (n_latent, n_complete)
+            # R line 28: x <- M$tau * Rxinv %*% t(M$PA) %*% t(dy)
+            x = self.tau * Rx_inv @ self.weights.T @ dy_complete.T
+
+            # Sufficient statistics
+            # R line 29: T <- t(dy) %*% t(x)
+            T = dy_complete.T @ x.T  # (n_var, n_latent)
+            # R line 30: trS <- sum(sum(dy * dy))
+            trS = np.sum(dy_complete**2)
+
+            # Store scores for complete observations (R lines 33-36)
+            scores[self.complete_obs_idx, :] = x.T
+        else:
+            T = np.zeros((self.n_var, self.n_latent))
+            trS = 0.0
+
+        # --- E-step for incomplete observations (R lines 39-60) ---
+        if len(self.incomplete_obs_idx) > 0:
+            for i in self.incomplete_obs_idx:
+                # Mask for this observation
+                is_missing = self.nan_mask[i, :]  # (n_var,)
+                is_observed = ~is_missing
+                n_missing = np.sum(is_missing)
+
+                # Observed centered data for this row
+                # R line 42: dyo <- y[i, !M$nans[i,], drop=FALSE] - M$mean[!M$nans[i,], drop=FALSE]
+                dyo = self.Xt[i, is_observed]  # (n_observed,)
+
+                # Partition weights
+                # R lines 43-44
+                Wm = self.weights[is_missing, :]  # (n_missing, n_latent)
+                Wo = self.weights[is_observed, :]  # (n_observed, n_latent)
+
+                # Modified precision matrix (remove contribution from missing features)
+                # R line 45: Rxinv <- solve((Rx - M$tau * t(Wm) %*% Wm))
+                Rx_inv_i = np.linalg.inv(Rx - self.tau * Wm.T @ Wm)
+
+                # Posterior mean of z for this observation
+                # R line 46: ex <- M$tau * t(Wo) %*% t(dyo)
+                ex = self.tau * Wo.T @ dyo  # (n_latent,)
+                # R line 47: x <- Rxinv %*% ex
+                x = Rx_inv_i @ ex  # (n_latent,)
+
+                # Impute missing values
+                # R line 48: dym <- Wm %*% x
+                dym = Wm @ x  # (n_missing,)
+
+                # Reconstruct full dy vector
+                # R lines 49-51
+                dy = np.zeros(self.n_var)
+                dy[is_observed] = dyo
+                dy[is_missing] = dym
+
+                # Update imputed data estimate
+                # R line 52: M$yest[i,] <- dy + M$mean
+                self.X_imputed[i, :] = dy + self.mu.flatten()
+
+                # Accumulate sufficient statistics
+                # R line 53: T <- T + t(dy) %*% t(x)
+                T = T + np.outer(dy, x)
+
+                # Special update for T at missing feature positions
+                # R line 54: T[M$nans[i,], ] <- T[M$nans[i,],, drop=FALSE] + Wm %*% Rxinv
+                T[is_missing, :] = T[is_missing, :] + Wm @ Rx_inv_i
+
+                # Update trS
+                # R lines 55-57: trS <- trS + dy %*% t(dy) + sum(M$nans[i,]) / M$tau +
+                #                       sum(diag(Wm %*% Rxinv %*% t(Wm)))
+                trS = trS + np.dot(dy, dy) + n_missing / self.tau + np.trace(Wm @ Rx_inv_i @ Wm.T)
+
+                # Store scores (R line 59)
+                scores[i, :] = x
+
+        # Normalize by number of observations (R lines 62-63)
+        T = T / self.n_obs
+        trS = trS / self.n_obs
+
+        return scores, T, trS
 
     def _m_step(self, zn: np.ndarray, M: np.ndarray) -> np.ndarray:
         """Maximization step
