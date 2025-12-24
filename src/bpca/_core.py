@@ -55,7 +55,7 @@ class BPCAFit:
     def __init__(
         self,
         X: np.ndarray,
-        alpha: float = 1,
+        n_latent: int | None = 50,
         sigma2: float = 1.0,
         max_iter: int = 1000,
         tol: float = 1e-6,
@@ -67,6 +67,8 @@ class BPCAFit:
         ----------
         X
             (n_var, n_obs)
+        n_latent
+            Number of latent dimensions to consider. If `None`, uses n_var - 1 dimensions
         alpha
             ARD prior strength
         sigma2
@@ -81,8 +83,14 @@ class BPCAFit:
 
         self.X = X
 
+        if n_latent is not None and n_latent > X.shape[0] - 1:
+            warnings.warn(
+                f"n_latent={n_latent} is larger than number of array dimensions ({X.shape[0]}). Set to maximum number {X.shape[0] - 1}",
+                stacklevel=2,
+            )
+        self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is None else X.shape[0]
+
         # Parameters
-        self.alpha = alpha
         self.sigma2 = sigma2
         self.init_w = init_w
         self._initialize_parameters()
@@ -100,7 +108,6 @@ class BPCAFit:
         Initializes w, z, mu, var
         """
         self.n_var, self.n_obs = self.X.shape
-        self.n_latent = self.n_var - 1
 
         self.z = None
         self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features,)
@@ -188,7 +195,8 @@ class BPCAFit:
             Posterior mean :math:`E[z|x]` of shape (n_latent, n_obs)
         """
         # z = M^{-1} @ W^T @ Xt, computed via solve for numerical stability
-        z = np.linalg.solve(M, self.w.T @ self.Xt)
+        # z = np.linalg.solve(M, self.w.T @ self.Xt)
+        z = np.linalg.inv(M) @ self.w.T @ self.Xt
 
         return z
 
