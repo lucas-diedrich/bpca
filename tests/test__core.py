@@ -72,11 +72,13 @@ class TestBPCAFitEstep:
         """(n_obs = 4, n_var=3) array and feature-wise mean"""
         return np.arange(12).reshape(4, 3)
 
-    def test_estep__return_values(self, array):
+    @pytest.mark.parametrize("n_latent", [2])
+    def test_estep__return_values(self, array: np.ndarray, n_latent: int) -> None:
         """Assert shapes are correct"""
         bpca = BPCAFit(X=array, n_latent=2)
-        scores, T, trs = bpca._e_step()
+        scores, T, trs, Rx = bpca._e_step()
 
-        assert scores.shape == (array.shape[0], 2)
-        assert T.shape == (array.shape[1], 2)
+        assert scores.shape == (array.shape[0], n_latent)
+        assert T.shape == (array.shape[1], n_latent)
         assert isinstance(trs, float)
+        assert Rx.shape == (n_latent, n_latent)

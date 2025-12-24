@@ -70,16 +70,24 @@ class BPCAFit:
     MAX_RESIDUAL_VARIANCE = 1e10
 
     GAMMA_ALPHA0 = 1e-10
-    """Uninformed prior for alpha parameter of gamma distribution"""
-    GAMMA_BETA0 = 1.0
-    """Uninformed prior for beta parameter of gamma distribution"""
+    """Uninformed prior for gamma parameter of gamma distribution for alpha parameter"""
+    BETA_ALPHA0 = 1.0
+    """Uninformed prior for beta parameter of gamma distribution for alpha parameter"""
+
+    GAMMA_TAU0 = 1e-10
+    """Uninformed prior for gamma parameter of gamma distribution for tau parameter"""
+    BETA_TAU0 = 1.0
+    """Uninformed prior for beta parameter of gamma distribution for tau parameter"""
+
+    GAMMA_MU0 = 0.001
+    """Hyperparameter for tau update"""
 
     def __init__(
         self,
         X: np.ndarray,
         n_latent: int | None = 50,
         max_iter: int = 1000,
-        tolerance: float = 1e-6,
+        tolerance: float = 1e-4,
     ) -> None:
         """Initialize Fit
 
@@ -161,7 +169,7 @@ class BPCAFit:
         self.alpha = (
             np.divide(
                 2 * self.GAMMA_ALPHA0 + self.n_var,
-                self.tau * np.sum(np.square(self.weights), axis=0) + 2 * self.GAMMA_ALPHA0 / self.GAMMA_BETA0,
+                self.tau * np.sum(np.square(self.weights), axis=0) + 2 * self.GAMMA_ALPHA0 / self.BETA_ALPHA0,
             )  # (n_latent, )
         )
 
@@ -209,25 +217,21 @@ class BPCAFit:
     def fit(self):
         """Fit model"""
         converged = False
-
-        tolgap = ...
-        z = ...
-        weights = ...
-
+        previous_tau = -np.inf
         for n_iter in range(self.max_iter):  # noqa: B007
-            self._e_step()
-            self._m_step()
+            scores, T, trS, Rx = self._e_step()
+            self._m_step(T, trS, Rx)
 
-            if tolgap < self.tolerance:
+            delta_tau = abs(np.log10(self.tau) - np.log10(previous_tau))
+            if delta_tau < self.tolerance:
                 converged = True
                 break
+            previous_tau = self.tau
+
+        self.z = scores
 
         if not converged:
             warnings.warn(f"Algorithm did not converge after {self.max_iter} steps", ConvergenceWarning, stacklevel=2)
-
-        # Store final latent representation
-        self.z = z
-        self.weights = weights
 
         self._converged = converged
         self._n_iter = n_iter + 1
@@ -241,11 +245,11 @@ class BPCAFit:
 
         Returns
         -------
-        scores : np.ndarray
+        scores
             Posterior mean E[z|x] of shape (n_obs, n_latent)
-        T : np.ndarray
+        T
             Cross-covariance sufficient statistic of shape (n_var, n_latent)
-        trS : float
+        trS
             Sum of squared residuals sufficient statistic
         """
         # Initialize scores matrix
@@ -339,25 +343,42 @@ class BPCAFit:
         T = T / self.n_obs
         trS = trS / self.n_obs
 
-        return scores, T, trS
+        return scores, T, trS, Rx
 
-    def _m_step(self, zn: np.ndarray, M: np.ndarray) -> np.ndarray:
+    def _m_step(self, T: np.ndarray, trS: float, Rx: np.ndarray) -> None:
         """Maximization step
 
         Finds parameters that maximize the expected loglikelihood.
 
         Parameters
         ----------
-        zn : np.ndarray
-            Posterior mean E[z|x] of shape (n_latent, n_obs)
-        M : np.ndarray
-            Precision matrix W.T @ W + σ²I of shape (n_latent, n_latent)
+        scores
+        T
+            Cross covariance between latent variable and observed values
+        trS
 
-        Returns
-        -------
-        M_new : np.ndarray
-            Updated precision matrix for next iteration
+        Rx
+            Precision matrix (n_latent, n_latent)
         """
+        Rx_inv = np.linalg.inv(Rx)
+
+        Dw = Rx_inv + self.tau * T.T @ self.weights @ Rx_inv + np.diag(self.alpha) / self.n_obs
+        Dw_inv = np.linalg.inv(Dw)
+
+        self.weights = T @ Dw_inv
+
+        self.tau = float(self.n_var + 2 * self.GAMMA_TAU0 / self.n_obs) / (
+            trS
+            - np.trace(T.T @ self.weights)
+            + (self.mu @ self.mu.T * self.GAMMA_MU0 + 2 * self.GAMMA_TAU0 / self.BETA_TAU0) / self.n_obs
+        )
+
+        self.var = Dw_inv * self.n_var / self.n_obs
+        self.alpha = (2 * self.GAMMA_ALPHA0 + self.n_var) / (
+            self.tau * np.diag(self.weights.T @ self.weights)
+            + np.diag(self.var)
+            + 2 * self.GAMMA_ALPHA0 / self.BETA_ALPHA0
+        )
 
     def _convergence_criterium(self):
         """Convergence criterium"""
