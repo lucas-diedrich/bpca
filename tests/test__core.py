@@ -64,3 +64,19 @@ class TestBPCAFitInit:
 
         assert np.array_equal(bpca.complete_obs_idx, complete_mask)
         assert np.array_equal(bpca.incomplete_obs_idx, missing_mask)
+
+
+class TestBPCAFitEstep:
+    @pytest.fixture
+    def array(self) -> tuple[np.ndarray, np.ndarray]:
+        """(n_obs = 4, n_var=3) array and feature-wise mean"""
+        return np.arange(12).reshape(4, 3)
+
+    def test_estep__return_values(self, array):
+        """Assert shapes are correct"""
+        bpca = BPCAFit(X=array, n_latent=2)
+        scores, T, trs = bpca._e_step()
+
+        assert scores.shape == (array.shape[0], 2)
+        assert T.shape == (array.shape[1], 2)
+        assert isinstance(trs, float)
