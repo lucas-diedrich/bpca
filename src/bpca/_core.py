@@ -10,6 +10,31 @@ class ConvergenceWarning(Warning):
     """Algorithm did not converge"""
 
 
+def _impute_missing(x: np.ndarray, strategy: Literal["median", "zero"] = "zero") -> np.ndarray:
+    """Impute missing values
+
+    Parameters
+    ----------
+    x
+        Matrix (n_obs, n_vars) with missing values
+    strategy
+        Imputation strategy
+            - `zero`: Impute zeros. Strategy in `pcaMethods`
+            - `median`: Impute feature-wise median of non-missing observations
+    """
+    missing_mask = np.isnan(x)
+    if not missing_mask.any():
+        return x
+
+    if strategy == "median":
+        feature_medians = np.nanmedian(x, axis=1, keepdims=True)
+        return np.where(missing_mask, feature_medians, x)
+    elif strategy == "zero":
+        return np.where(missing_mask, 0, x)
+    else:
+        raise ValueError(f"`strategy` must be one of ('zero', 'median'), not {strategy}")
+
+
 class BPCAFit:
     r"""Bayesian principal component analysis fitting procedure
 
@@ -51,6 +76,7 @@ class BPCAFit:
     """
 
     _INIT_W_OPTIONS = ("svd", "random")
+    _IMPUTATION_OPTIONS = ("zero", "median")
 
     def __init__(
         self,
@@ -58,8 +84,8 @@ class BPCAFit:
         n_latent: int | None = 50,
         sigma2: float = 1.0,
         max_iter: int = 1000,
-        tol: float = 1e-6,
-        init_w: Literal["svd", "random"] = "random",
+        tolerance: float = 1e-6,
+        weight_init_strategy: Literal["svd", "random"] = "random",
     ) -> None:
         """Initialize Fit
 
@@ -75,13 +101,50 @@ class BPCAFit:
             Variance prior
         max_iter
             Maximum number of EM iterations
-        tol
+        tolerance
             Convergence tolerance
+        weight_init_strategy
+            How to initialize weight matrix (svd: PCA on zero-imputed data, random: random uniform 0-1 weight initialization)
         """
-        if init_w not in self._INIT_W_OPTIONS:
-            raise ValueError(f"init_w must be one of {self._INIT_W_OPTIONS}, not {init_w}")
+        if weight_init_strategy not in self._INIT_W_OPTIONS:
+            raise ValueError(f"init_w must be one of {self._INIT_W_OPTIONS}, not {weight_init_strategy}")
 
         self.X = X
+
+        # Parameters
+        self._initialize_em_parameters(
+            self.X, n_latent=n_latent, sigma2=sigma2, weight_init_strategy=weight_init_strategy
+        )
+        self._initialize_fit_procedure_parameters(max_iter=max_iter, tolerance=tolerance)
+        self._initialize_fit_result_parameters()
+
+    def _initialize_em_parameters(
+        self, X: np.ndarray, n_latent: int, sigma2: float, weight_init_strategy: Literal["random", "svd"] = "svd"
+    ):
+        """Initialize parameters for EM algorithm
+
+        Initializes
+            - shape parameters `n_var`, `n_obs`
+            - Number of latent dimensions `n_latent`
+            - mean `mu`
+            - mean-centered data `Xt`
+            - Latent variable `z`
+            - loadings `weights`
+            - unexplained variance matrix `var`
+            - ARD prior `alpha`
+
+        Parameters
+        ----------
+        X
+            Data (n_observations, n_features)
+        n_latent
+            Number of latent dimensions
+        sigma2
+            Variance
+        weight_init_strategy
+            How to initialize weights
+        """
+        self.n_var, self.n_obs = X.shape
 
         if n_latent is not None and n_latent > X.shape[0] - 1:
             warnings.warn(
@@ -90,83 +153,68 @@ class BPCAFit:
             )
         self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is None else X.shape[0]
 
-        # Parameters
-        self.sigma2 = sigma2
-        self.init_w = init_w
-        self._initialize_parameters()
+        self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features, 1)
+        self.Xt = X - self.mu
 
-        # Fitting parameters
-        self.max_iter = max_iter
-        self.tol = tol
-
-        self._n_iter = None
-        self._is_fit = False
-
-    def _initialize_parameters(self):
-        """Initialize fitting parameters
-
-        Initializes w, z, mu, var
-        """
-        self.n_var, self.n_obs = self.X.shape
+        self.var = sigma2 * np.eye(self.n_latent)  # (n_latent, n_latent)
 
         self.z = None
-        self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features,)
-        self.var = self.sigma2 * np.eye(self.n_latent)  # (n_latent, n_latent)
-
-        self.Xt = self.X - self.mu
-        self.w = (
+        self.weights = (
             np.random.rand(self.n_var, self.n_latent)
             if self.init_w == "random"
-            else self._svd_initialize_w(x=self.Xt, n_latent=self.n_latent)
+            else self._svd_initialize_weights(x=self.Xt, n_latent=self.n_latent)
         )  # (n_features, n_latent)
+
+        # TODO: Evaluate unexplained variance estimation via PCA
 
         self.alpha = np.random.rand(self.n_latent)  # (n_latent,)
 
-    def _impute_missing(self, x: np.ndarray) -> np.ndarray:
-        """Impute missing values with feature-wise median"""
-        missing_mask = np.isnan(x)
-        if not missing_mask.any():
-            return x
-
-        # Compute feature-wise median (ignoring NaN)
-        feature_medians = np.nanmedian(x, axis=1, keepdims=True)
-
-        # Impute missing values
-        return np.where(missing_mask, feature_medians, x)
-
-    def _svd_initialize_w(self, x: np.ndarray, n_latent: int) -> np.ndarray:
+    def _svd_initialize_weights(self, X: np.ndarray, n_latent: int, strategy: str = "zero") -> np.ndarray:
         """SVD initialize data
 
         Parameters
         ----------
         x
             (n_obs, n_var)
+        n_latent
+            Number of latent dimensions to consider
         """
-        x = self._impute_missing(x)
-        U, S, _ = np.linalg.svd(x.T, full_matrices=False)
+        X = _impute_missing(X, strategy=strategy)
+        covariance_matrix = X @ X.T
+        U, S, _ = np.linalg.svd(covariance_matrix, full_matrices=False)
 
         return U.T[:, :n_latent] * S.T[:n_latent]  # or just U[:, :q]
+
+    def _initialize_fit_procedure_parameters(self, max_iter: int, tolerance: float) -> None:
+        """Initialize paramters of the fitting procedure
+
+        Initalizes `max_iter`, `tolerance`
+        """
+        self.max_iter = max_iter
+        self.tolerance = tolerance
+
+    def _initialize_fit_result_parameters(self) -> None:
+        """Initialize parameters that are used to evaluate the fitting procedure
+
+        Initializes `_converged`, `_n_iter`, `_is_fit`
+        """
+        self._converged = None
+        self._n_iter = None
+        self._is_fit = False
 
     def fit(self):
         """Fit model"""
         converged = False
 
-        # Initialize M before loop (matches C reference)
-        M = self.w.T @ self.w + self.sigma2 * np.eye(self.n_latent)
+        tolgap = ...
+        zn = ...
+        weights = ...
 
         for n_iter in range(self.max_iter):  # noqa: B007
-            w_old = self.w.copy()
-            sigma2_old = self.sigma2
+            self._e_step()
+            self._m_step()
 
-            zn = self._e_step(M)
-            M = self._m_step(zn=zn, M=M)
-
-            # Convergence check: min of W change and sigma2 change
-            w_change = np.linalg.norm(self.w - w_old)
-            sigma2_change = np.abs(self.sigma2 - sigma2_old)
-            tolgap = min(w_change, sigma2_change)
-
-            if tolgap < self.tol:
+            if tolgap < self.tolerance:
                 converged = True
                 break
 
@@ -175,7 +223,9 @@ class BPCAFit:
 
         # Store final latent representation
         self.z = zn
+        self.weights = weights
 
+        self._converged = converged
         self._n_iter = n_iter + 1
         self._is_fit = True
 
@@ -194,11 +244,6 @@ class BPCAFit:
         zn : np.ndarray
             Posterior mean :math:`E[z|x]` of shape (n_latent, n_obs)
         """
-        # z = M^{-1} @ W^T @ Xt, computed via solve for numerical stability
-        # z = np.linalg.solve(M, self.w.T @ self.Xt)
-        z = np.linalg.inv(M) @ self.w.T @ self.Xt
-
-        return z
 
     def _m_step(self, zn: np.ndarray, M: np.ndarray) -> np.ndarray:
         """Maximization step
@@ -217,33 +262,9 @@ class BPCAFit:
         M_new : np.ndarray
             Updated precision matrix for next iteration
         """
-        # Update W
-        # W_LHS = X @ Z.T  (n_var, n_latent)
-        w1 = self.Xt @ zn.T
 
-        # W_RHS = σ² diag(α) + σ² N M + Z @ Z.T  (n_latent, n_latent)
-        w2 = self.sigma2 * np.diag(self.alpha) + self.sigma2 * self.n_obs * M + zn @ zn.T
-        self.w = np.linalg.solve(w2.T, w1.T).T  # Equivalent to w1 @ inv(w2)
-
-        # Compute new M with OLD sigma2 (matches C reference timing)
-        M_new = self.w.T @ self.w + self.sigma2 * np.eye(self.n_latent)
-
-        # Update sigma
-        # σ² = 1/(N*d) * Σ_i [||x_i||² - 2 z_i^T W^T x_i + tr((σ²M + z_i z_i^T) W^T W)]
-        WtW = self.w.T @ self.w  # (n_latent, n_latent)
-
-        s1 = np.sum(self.Xt**2, axis=0)  # (n_obs,)
-        s2 = -2 * np.sum(zn * (self.w.T @ self.Xt), axis=0)  # (n_obs,)
-        base_trace = self.sigma2 * np.trace(M @ WtW)  # Shared across observations
-        per_obs_trace = np.sum(zn * (WtW @ zn), axis=0)  # z_i^T WtW z_i for each i
-        s3 = base_trace + per_obs_trace  # (n_obs,)
-
-        self.sigma2 = np.sum(s1 + s2 + s3) / (self.n_obs * self.n_var)
-
-        # Update alpha (ARD hyperparameters)
-        self.alpha = self.n_var / np.square(np.linalg.norm(self.w, axis=0))
-
-        return M_new
+    def _convergence_criterium(self):
+        """Convergence criterium"""
 
     def _check_is_fit(self) -> None:
         if not self._is_fit:
