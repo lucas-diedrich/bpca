@@ -27,7 +27,7 @@ def _impute_missing(x: np.ndarray, strategy: Literal["median", "zero"] = "zero")
         return x
 
     if strategy == "median":
-        feature_medians = np.nanmedian(x, axis=1, keepdims=True)
+        feature_medians = np.nanmedian(x, axis=0, keepdims=True)
         return np.where(missing_mask, feature_medians, x)
     elif strategy == "zero":
         return np.where(missing_mask, 0, x)
@@ -56,9 +56,7 @@ class BPCAFit:
 
         iris_dataset = load_iris()
         X = iris_dataset["data"] # (n_obs, n_var)
-
-        # Expects (n_var, n_obs)
-        bpca = BPCAFit(X=X.T)
+        bpca = BPCAFit(X=X)
         bpca.fit()
 
     Citation
@@ -66,7 +64,6 @@ class BPCAFit:
     Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
     """
 
-    _INIT_W_OPTIONS = ("svd", "random")
     _IMPUTATION_OPTIONS = ("zero", "median")
 
     MIN_RESIDUAL_VARIANCE = 1e-10
@@ -89,7 +86,7 @@ class BPCAFit:
         Parameters
         ----------
         X
-            (n_var, n_obs)
+            (n_obs, n_var)
         n_latent
             Number of latent dimensions to consider. If `None`, uses n_var - 1 dimensions
         alpha
@@ -136,16 +133,16 @@ class BPCAFit:
         weight_init_strategy
             How to initialize weights
         """
-        self.n_var, self.n_obs = X.shape
+        self.n_obs, self.n_var = X.shape
 
-        if n_latent is not None and n_latent > X.shape[0] - 1:
+        if n_latent is not None and n_latent > min(X.shape):
             warnings.warn(
-                f"n_latent={n_latent} is larger than number of array dimensions ({X.shape[0]}). Set to maximum number {X.shape[0] - 1}",
+                f"n_latent={n_latent} is larger than number of array dimensions ({X.shape}). Set to maximum number {min(X.shape)}",
                 stacklevel=2,
             )
-        self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is not None else X.shape[0]
+        self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is not None else X.shape[1] - 1
 
-        self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features, 1)
+        self.mu = np.nanmean(self.X, axis=0, keepdims=True)  # (n_features, 1)
         self.Xt = X - self.mu
 
         self.z = None
@@ -178,7 +175,7 @@ class BPCAFit:
             - Residual unexplained variance by SVD
         """
         X = _impute_missing(X, strategy=strategy)
-        covariance_matrix = (X @ X.T) / (X.shape[1] - 1)
+        covariance_matrix = (X.T @ X) / (X.shape[0] - 1)
         U, S, _ = np.linalg.svd(covariance_matrix, full_matrices=False)
 
         residual_variance = np.trace(covariance_matrix) - np.sum(S[:n_latent])
