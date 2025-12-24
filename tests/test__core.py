@@ -54,3 +54,13 @@ class TestBPCAFitInit:
         assert bpca._converged is None
         assert bpca._n_iter is None
         assert bpca._is_fit is False
+
+    @pytest.mark.parametrize(
+        ("X", "complete_mask", "missing_mask"),
+        [(np.array([[0, 0, 0], [np.nan, 0, 0], [np.nan, 0, 0]]), np.array([0]), np.array([1, 2]))],
+    )
+    def test_bpcafit_init_complete(self, X: np.ndarray, complete_mask: np.ndarray, missing_mask: np.ndarray) -> None:
+        bpca = BPCAFit(X=X)
+
+        assert np.array_equal(bpca.complete_obs_idx, complete_mask)
+        assert np.array_equal(bpca.incomplete_obs_idx, missing_mask)
