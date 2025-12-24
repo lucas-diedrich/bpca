@@ -40,20 +40,11 @@ class BPCAFit:
 
     Fits the model with an EM-procedure
 
-    Initialization
-        - W: Random (randu)
-        - sigma2: 1
-        - alpha (n_latent,): Random (randu)
-        - var: Sigma2 x Identity matrix
-        - Z: Zeros
-
-    E step
-        - <xn> = M-1 x W.T x (X - t)
-
-    M step
-        - Update W
-        - Update sigma
-        - Update alpha
+    1. Initialization
+    2. Run until convergence
+        1. E-step (latent variable z computation)
+        2. M-Step (update weights, ARD parameter alpha, unexplained variance sigma)
+    3. Report
 
     Examples
     --------
@@ -78,14 +69,20 @@ class BPCAFit:
     _INIT_W_OPTIONS = ("svd", "random")
     _IMPUTATION_OPTIONS = ("zero", "median")
 
+    MIN_RESIDUAL_VARIANCE = 1e-10
+    MAX_RESIDUAL_VARIANCE = 1e10
+
+    GAMMA_ALPHA0 = 1e-10
+    """Uninformed prior for alpha parameter of gamma distribution"""
+    GAMMA_BETA0 = 1.0
+    """Uninformed prior for beta parameter of gamma distribution"""
+
     def __init__(
         self,
         X: np.ndarray,
         n_latent: int | None = 50,
-        sigma2: float = 1.0,
         max_iter: int = 1000,
         tolerance: float = 1e-6,
-        weight_init_strategy: Literal["svd", "random"] = "random",
     ) -> None:
         """Initialize Fit
 
@@ -103,23 +100,18 @@ class BPCAFit:
             Maximum number of EM iterations
         tolerance
             Convergence tolerance
-        weight_init_strategy
-            How to initialize weight matrix (svd: PCA on zero-imputed data, random: random uniform 0-1 weight initialization)
         """
-        if weight_init_strategy not in self._INIT_W_OPTIONS:
-            raise ValueError(f"init_w must be one of {self._INIT_W_OPTIONS}, not {weight_init_strategy}")
-
         self.X = X
 
         # Parameters
-        self._initialize_em_parameters(
-            self.X, n_latent=n_latent, sigma2=sigma2, weight_init_strategy=weight_init_strategy
-        )
+        self._initialize_em_parameters(self.X, n_latent=n_latent)
         self._initialize_fit_procedure_parameters(max_iter=max_iter, tolerance=tolerance)
         self._initialize_fit_result_parameters()
 
     def _initialize_em_parameters(
-        self, X: np.ndarray, n_latent: int, sigma2: float, weight_init_strategy: Literal["random", "svd"] = "svd"
+        self,
+        X: np.ndarray,
+        n_latent: int,
     ):
         """Initialize parameters for EM algorithm
 
@@ -151,39 +143,47 @@ class BPCAFit:
                 f"n_latent={n_latent} is larger than number of array dimensions ({X.shape[0]}). Set to maximum number {X.shape[0] - 1}",
                 stacklevel=2,
             )
-        self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is None else X.shape[0]
+        self.n_latent = min(n_latent, X.shape[0], X.shape[1]) if n_latent is not None else X.shape[0]
 
         self.mu = np.nanmean(self.X, axis=1, keepdims=True)  # (n_features, 1)
         self.Xt = X - self.mu
 
-        self.var = sigma2 * np.eye(self.n_latent)  # (n_latent, n_latent)
-
         self.z = None
-        self.weights = (
-            np.random.rand(self.n_var, self.n_latent)
-            if self.init_w == "random"
-            else self._svd_initialize_weights(x=self.Xt, n_latent=self.n_latent)
-        )  # (n_features, n_latent)
+        self.weights, residual_variance = self._pca(X=self.Xt, n_latent=self.n_latent)  # (n_features, n_latent), float
+        self.tau = 1 / np.clip(residual_variance, self.MIN_RESIDUAL_VARIANCE, self.MAX_RESIDUAL_VARIANCE)
 
-        # TODO: Evaluate unexplained variance estimation via PCA
+        self.var = np.eye(self.n_latent)  # (n_latent, n_latent)
 
-        self.alpha = np.random.rand(self.n_latent)  # (n_latent,)
+        self.alpha = (
+            np.divide(
+                2 * self.GAMMA_ALPHA0 + self.n_var,
+                self.tau * np.sum(np.square(self.weights), axis=0) + 2 * self.GAMMA_ALPHA0 / self.GAMMA_BETA0,
+            )  # n_latent
+        )
 
-    def _svd_initialize_weights(self, X: np.ndarray, n_latent: int, strategy: str = "zero") -> np.ndarray:
-        """SVD initialize data
+    def _pca(self, X: np.ndarray, n_latent: int, strategy: str = "zero") -> tuple[np.ndarray, float]:
+        """Run PCA on imputed data
 
         Parameters
         ----------
         x
-            (n_obs, n_var)
+            (n_obs, n_var), mean-centered data
         n_latent
             Number of latent dimensions to consider
+
+        Returns
+        -------
+        weights, residual_variance
+            - Weights (n_features, n_latent)
+            - Residual unexplained variance by SVD
         """
         X = _impute_missing(X, strategy=strategy)
-        covariance_matrix = X @ X.T
+        covariance_matrix = (X @ X.T) / (X.shape[1] - 1)
         U, S, _ = np.linalg.svd(covariance_matrix, full_matrices=False)
 
-        return U.T[:, :n_latent] * S.T[:n_latent]  # or just U[:, :q]
+        residual_variance = np.trace(covariance_matrix) - np.sum(S[:n_latent])
+
+        return U[:, :n_latent] * np.sqrt(S).T[:n_latent], residual_variance
 
     def _initialize_fit_procedure_parameters(self, max_iter: int, tolerance: float) -> None:
         """Initialize paramters of the fitting procedure
