@@ -1,0 +1,21 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: bpca
+message: Bayesian Principal Component Analysis in Python
+type: software
+authors:
+  - given-names: Lucas
+    family-names: Diedrich
+    email: diedrich@biochem.mpg.de
+    affiliation: 'Max Planck Institute for Biochemistry '
+    orcid: 'https://orcid.org/0009-0007-4884-1422'
+repository-code: 'https://github.com/lucas-diedrich/bpca.git'
+url: 'https://github.com/lucas-diedrich/bpca.git'
+abstract: Bayesian Principal Component analysis in Python
+keywords:
+  - Expectation Maximization
+  - Bayesian Principal Component Regression
+  - Scientific Software
+license: MIT
