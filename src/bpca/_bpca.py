@@ -91,7 +91,7 @@ class BPCA:
         self._alpha = bpca.alpha.flatten()  # (n_latent,)
         self._components = bpca.z  # (n_latent, n_obs) -> (n_obs, n_latent)
         self._loadings = bpca.weights.T  # (n_var, n_latent) -> (n_latent, n_var)
-        self._tau = float(bpca.tau)
+        self._tau = float(bpca.tau.flatten())
         self._n_iter = bpca.n_iter
 
         self._explained_variance_ratio_ = compute_variance_explained(
