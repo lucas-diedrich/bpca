@@ -383,10 +383,6 @@ class BPCAFit:
     def _convergence_criterium(self):
         """Convergence criterium"""
 
-    def _check_is_fit(self) -> None:
-        if not self._is_fit:
-            raise RuntimeError("Run .fit() method first")
-
     @property
     def n_iter(self) -> int:
         """Number of iterations until convergence"""
