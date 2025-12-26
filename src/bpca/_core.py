@@ -384,7 +384,7 @@ class BPCAFit:
         self.weights = T @ Dw_inv
 
         # Note: self.mu @ self.mu.T produces a (1,1) array, so we need to extract scalar
-        mu_sq = float(self.mu @ self.mu.T)
+        mu_sq = float((self.mu @ self.mu.T).squeeze())
         self.tau = (self.n_var + 2 * self.GAMMA_TAU0 / self.n_obs) / (
             trS
             - np.trace(T.T @ self.weights)
