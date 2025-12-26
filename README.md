@@ -48,6 +48,7 @@ If you found a bug, please use the [issue tracker][].
 This package implements the algorithm proposed by Oba, 2003 and is built on the reference implementation by Stacklies et al, 2008 **Please cite the original authors**
 
 > Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
+
 > Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
 
 Generative model proposed by Bishop, 1998:
