@@ -1,24 +1,38 @@
 # bpca
 
 [![Tests][badge-tests]][tests]
+[![Integration Tests](badge-integration-tests)](integration-tests)
 [![Documentation][badge-docs]][documentation]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/lucas-diedrich/bpca/test.yaml?branch=main
+[badge-integration-tests]: https://github.com/lucas-diedrich/bpca/actions/workflows/integration-test.yaml/badge.svg
 [badge-docs]: https://img.shields.io/readthedocs/bpca
 
 Bayesian Principal Component Analysis
 
 ## Getting started
+BPCA follows the standard scikit-learn syntax
 
-Please refer to the [documentation][],
-in particular, the [API documentation][].
+```python
+from bpca import BPCA
+from sklearn.datasets import load_iris
+
+iris_dataset = load_iris()
+X = iris_dataset["data"]
+
+# Fit + Extract information
+bpca = BPCA(n_components=2)
+usage = bpca.fit_transform(X)
+loadings = bpca.components_
+explained_variance_ratio = bpca.explained_variance_ratio_
+```
+
+Please refer to the [documentation][], in particular, the [API documentation][].
+
 
 ## Installation
 
 You need to have Python 3.11 or newer installed on your system.
-If you don't have Python installed, we recommend installing [uv][].
-
-There are several alternative options to install bpca:
 
 <!--
 1) Install the latest release of `bpca` from [PyPI][]:
@@ -36,7 +50,7 @@ pip install git+https://github.com/lucas-diedrich/bpca.git@main
 
 ## Release notes
 
-See the [changelog][].
+See the [Release Notes][].
 
 ## Contact
 
@@ -62,7 +76,8 @@ If you find this implementation useful, consider giving it a star on GitHub and 
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/lucas-diedrich/bpca/issues
 [tests]: https://github.com/lucas-diedrich/bpca/actions/workflows/test.yaml
+[integration-tests]: https://github.com/lucas-diedrich/bpca/actions/workflows/integration-test.yaml
 [documentation]: https://bpca.readthedocs.io
-[changelog]: https://github.com/lucas-diedrich/bpca/releases
+[Release Notes]: https://github.com/lucas-diedrich/bpca/releases
 [api documentation]: https://bpca.readthedocs.io/en/latest/api.html
 [pypi]: https://pypi.org/project/bpca
