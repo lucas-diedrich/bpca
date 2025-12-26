@@ -1,7 +1,7 @@
 # bpca
 
 [![Tests][badge-tests]][tests]
-[![Integration Tests](badge-integration-tests)](integration-tests)
+[![Integration Tests][badge-integration-tests]][integration-tests]
 [![Documentation][badge-docs]][documentation]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/lucas-diedrich/bpca/test.yaml?branch=main
