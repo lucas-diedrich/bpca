@@ -43,8 +43,8 @@ def run_bpca(
     model.fit(X)
 
     return {
-        "scores": model._components,  # (n_obs, n_latent)
-        "loadings": model._loadings.T,  # (n_var, n_latent) - transposed to match R
+        "scores": model._usage,  # (n_obs, n_latent)
+        "loadings": model._components.T,  # (n_var, n_latent) - transposed to match R
     }
 
 
