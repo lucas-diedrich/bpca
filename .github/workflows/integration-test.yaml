@@ -1,0 +1,86 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    name: Integration test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 'latest'
+          init-shell: bash
+          generate-run-shell: false
+
+      - name: Create R environment
+        shell: bash -el {0}
+        run: |
+          micromamba create -n r -y \
+            -c conda-forge \
+            -c bioconda \
+            r-base>=4.0 \
+            bioconductor-pcamethods \
+            r-jsonlite
+
+      - name: Create Python environment and install bpca
+        shell: bash -el {0}
+        run: |
+          micromamba create -n bpca -y \
+            -c conda-forge \
+            python==3.12 \
+            numpy \
+            pytest
+          micromamba run -n bpca pip install -e .
+
+      - name: Generate test cases
+        shell: bash -el {0}
+        run: |
+          mkdir -p /tmp/bpca_integration_test/{inputs,r_outputs,py_outputs}
+          micromamba run -n bpca python tests/integration/generate_test_cases.py \
+            --output-dir /tmp/bpca_integration_test/inputs
+
+      - name: Run R implementation
+        shell: bash -el {0}
+        run: |
+          micromamba run -n r Rscript tests/integration/run_bpca_r.R \
+            /tmp/bpca_integration_test/inputs \
+            /tmp/bpca_integration_test/r_outputs
+
+      - name: Run Python implementation
+        shell: bash -el {0}
+        run: |
+          micromamba run -n bpca python tests/integration/run_bpca_python.py \
+            /tmp/bpca_integration_test/inputs \
+            /tmp/bpca_integration_test/py_outputs
+
+      - name: Run equivalence tests
+        shell: bash -el {0}
+        env:
+          BPCA_TEST_INPUT_DIR: /tmp/bpca_integration_test/inputs
+          BPCA_TEST_R_OUTPUT_DIR: /tmp/bpca_integration_test/r_outputs
+          BPCA_TEST_PY_OUTPUT_DIR: /tmp/bpca_integration_test/py_outputs
+        run: |
+          micromamba run -n bpca pytest tests/integration/test_equivalence.py -v --tb=short
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-outputs
+          path: /tmp/bpca_integration_test/
+          retention-days: 7

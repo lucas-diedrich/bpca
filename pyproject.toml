@@ -40,6 +40,7 @@ dev = [
 test = [
   "coverage>=7.10",
   "pytest",
+  "scikit-learn",
 ]
 doc = [
   "ipykernel",
