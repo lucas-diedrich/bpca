@@ -68,7 +68,7 @@ This package implements the algorithm proposed by Oba, 2003 and is built on the 
 Generative model proposed by Bishop, 1998:
 > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
 
-If you find this implementation useful, consider giving it a star on GitHub and [cite this implementation](CITATION.cff)
+If you find this implementation useful, consider giving it a star on GitHub and [cite this implementation](https://github.com/lucas-diedrich/bpca/blob/main/CITATION.cff)
 
 > Diedrich, L. bpca [Computer software]. https://github.com/lucas-diedrich/bpca.git
 
