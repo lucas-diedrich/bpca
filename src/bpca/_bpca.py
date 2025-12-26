@@ -5,7 +5,7 @@ import numpy as np
 from ._core import BPCAFit
 
 
-def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.ndarray) -> np.ndarray:
     """Compute variance explained by each component.
 
     Uses leave-one-out contributions normalized to sum to total R².
@@ -47,11 +47,36 @@ def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.nd
         # Raw contribution of component k
         contributions[k] = residual_without_k - full_residual_ss
 
-    return contributions / contributions.sum() * total_r2
+    return contributions / np.nansum(contributions) * total_r2
 
 
 class BPCA:
-    """Bayesian principal component analysis"""
+    """Bayesian principal component analysis (BPCA)
+
+    Implements the BPCA method (generative model suggested by Bishop, 1998) as suggested by Oba et al (2003).
+    The implementation follows the reference implementation in R (Stacklies, 2007).
+
+    Examples
+    --------
+
+    .. code:: python
+
+        from bpca import BPCA
+        from sklearn.datasets import load_iris
+
+        iris_dataset = load_iris()
+        X = iris_dataset["data"] # (n_obs, n_var)
+        bpca = BPCA(n_components=None)
+
+        usage = bpca.fit_transform(X) # (n_components, n_latent)
+        weights = bpca.components_  # (n_latent, n_var)
+
+    Citation
+    --------
+    > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+    > Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
+    > Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
+    """
 
     def __init__(
         self,
@@ -89,14 +114,12 @@ class BPCA:
 
         self._mu = bpca.mu
         self._alpha = bpca.alpha.flatten()  # (n_latent,)
-        self._components = bpca.z  # (n_latent, n_obs) -> (n_obs, n_latent)
-        self._loadings = bpca.weights.T  # (n_var, n_latent) -> (n_latent, n_var)
+        self._usage = bpca.z  # (n_latent, n_obs) -> (n_obs, n_latent)
+        self._components = bpca.weights.T  # (n_var, n_components) -> (n_components, n_var)
         self._tau = float(bpca.tau.squeeze())
         self._n_iter = bpca.n_iter
 
-        self._explained_variance_ratio_ = compute_variance_explained(
-            X=X, usage=self._components, loadings=self._loadings
-        )
+        self._explained_variance_ratio_ = compute_variance_explained(X=X, usage=self._usage, loadings=self._components)
 
         self._is_fit = True
 
@@ -117,7 +140,7 @@ class BPCA:
         """
         self._check_is_fit()
         X_centered = X - self._mu
-        return X_centered @ self._loadings.T
+        return X_centered @ self._components.T
 
     def fit_transform(self, X: np.ndarray) -> np.ndarray:
         """Fit model and return transformed training data.
@@ -133,7 +156,7 @@ class BPCA:
             Transformed data (n_obs, n_components)
         """
         self.fit(X)
-        return self._components
+        return self._usage
 
     def _check_is_fit(self) -> None:
         """Check whether model is fit

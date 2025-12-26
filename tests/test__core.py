@@ -207,7 +207,7 @@ class TestBPCAFitFitStep:
         assert bpca.z.shape == (array.shape[0], n_latent)
         assert bpca.weights.shape == (array.shape[1], n_latent)
         assert bpca.tau > 0
-        assert bpca.alpha.shape == (1, n_latent)
+        assert bpca.alpha.shape == (n_latent,)
         assert (bpca.alpha > 0).all()
 
     def test_fit__convereges(self, array_converge: np.ndarray) -> None:

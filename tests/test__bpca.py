@@ -15,6 +15,17 @@ class TestComputeVarianceExplained:
 
         return rng.normal(loc=0, scale=1, size=(50, 100))
 
+    @pytest.fixture
+    def array_with_nan(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        X = np.array([[-1, np.nan], [0, 0], [1, 0]])
+
+        usage = np.array([[-1, 0, 1]]).T
+        loadings = np.array([[1, 0]])
+
+        explained_variance = np.array([1.0])
+
+        return X, usage, loadings, explained_variance
+
     def test_compute_variance_explained(self, random_array: np.ndarray) -> None:
         """Test that variance explained computation yields consistent results with default procedure for PCA"""
         pca = PCA(n_components=10)
@@ -24,6 +35,11 @@ class TestComputeVarianceExplained:
         res = compute_variance_explained(random_array, usage, loadings)
 
         assert np.allclose(pca.explained_variance_ratio_, res)
+
+    def test_compute_variance_explained_supports_nan(self, array_with_nan: tuple[np.ndarray]):
+        X, usage, loadings, explained_variance = array_with_nan
+        result = compute_variance_explained(X, usage, loadings)
+        assert np.allclose(result, explained_variance)
 
 
 class TestBPCAInit:
@@ -75,8 +91,8 @@ class TestBPCAFit:
 
         assert bpca._is_fit is True
         assert bpca._mu.shape == (1, array.shape[1])
-        assert bpca._components.shape == (array.shape[0], n_components)
-        assert bpca._loadings.shape == (n_components, array.shape[1])
+        assert bpca._usage.shape == (array.shape[0], n_components)
+        assert bpca._components.shape == (n_components, array.shape[1])
         assert bpca._alpha.shape == (n_components,)
         assert isinstance(bpca._tau, float)
         assert bpca._tau > 0
@@ -123,7 +139,10 @@ class TestBPCAFitTransform:
     @pytest.fixture
     def array(self) -> np.ndarray:
         rng = np.random.default_rng(seed=42)
-        return rng.normal(size=(20, 10))
+        usage = rng.normal(size=(20, 5))
+        loadings = rng.normal(size=(5, 10))
+
+        return usage @ loadings
 
     def test_bpca_fit_transform(self, array: np.ndarray) -> None:
         """Fitted BPCA model and training data"""
@@ -144,7 +163,10 @@ class TestBPCAProperties:
     def fitted_bpca(self) -> tuple[BPCA, np.ndarray]:
         """Fitted BPCA model and training data"""
         rng = np.random.default_rng(seed=42)
-        X = rng.normal(size=(20, 10))
+        usage = rng.normal(size=(20, 3))
+        loadings = rng.normal(size=(3, 10))
+        X = usage @ loadings
+
         bpca = BPCA(n_components=3, max_iter=50)
         bpca.fit(X)
         return bpca, X
@@ -167,7 +189,7 @@ class TestBPCAProperties:
 
         result = bpca.components_
 
-        assert result.shape == (X.shape[0], 3)
+        assert result.shape == (3, X.shape[1])
 
     def test_explained_variance_ratio_shape(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
         bpca, _ = fitted_bpca
