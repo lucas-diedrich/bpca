@@ -91,8 +91,8 @@ class TestBPCAFit:
 
         assert bpca._is_fit is True
         assert bpca._mu.shape == (1, array.shape[1])
-        assert bpca._components.shape == (array.shape[0], n_components)
-        assert bpca._loadings.shape == (n_components, array.shape[1])
+        assert bpca._usage.shape == (array.shape[0], n_components)
+        assert bpca._components.shape == (n_components, array.shape[1])
         assert bpca._alpha.shape == (n_components,)
         assert isinstance(bpca._tau, float)
         assert bpca._tau > 0
@@ -189,7 +189,7 @@ class TestBPCAProperties:
 
         result = bpca.components_
 
-        assert result.shape == (X.shape[0], 3)
+        assert result.shape == (3, X.shape[1])
 
     def test_explained_variance_ratio_shape(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
         bpca, _ = fitted_bpca
