@@ -28,7 +28,7 @@ jobs:
           generate-run-shell: false
 
       - name: Create R environment
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         run: |
           micromamba create -n r -y \
             -c conda-forge \
@@ -38,7 +38,7 @@ jobs:
             r-jsonlite
 
       - name: Create Python environment and install bpca
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         run: |
           micromamba create -n bpca -y \
             -c conda-forge \
@@ -48,28 +48,28 @@ jobs:
           micromamba run -n bpca pip install -e .
 
       - name: Generate test cases
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         run: |
           mkdir -p /tmp/bpca_integration_test/{inputs,r_outputs,py_outputs}
           micromamba run -n bpca python tests/integration/generate_test_cases.py \
             --output-dir /tmp/bpca_integration_test/inputs
 
       - name: Run R implementation
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         run: |
           micromamba run -n r Rscript tests/integration/run_bpca_r.R \
             /tmp/bpca_integration_test/inputs \
             /tmp/bpca_integration_test/r_outputs
 
       - name: Run Python implementation
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         run: |
           micromamba run -n bpca python tests/integration/run_bpca_python.py \
             /tmp/bpca_integration_test/inputs \
             /tmp/bpca_integration_test/py_outputs
 
       - name: Run equivalence tests
-        shell: micromamba-shell {0}
+        shell: bash -el {0}
         env:
           BPCA_TEST_INPUT_DIR: /tmp/bpca_integration_test/inputs
           BPCA_TEST_R_OUTPUT_DIR: /tmp/bpca_integration_test/r_outputs
