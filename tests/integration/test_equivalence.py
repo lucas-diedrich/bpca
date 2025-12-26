@@ -236,6 +236,14 @@ def test_reconstruction_equivalence(test_results, case_id):
     r_reconstruction = r_scores @ r_loadings.T  # (n_obs, n_var)
     py_reconstruction = py_scores @ py_loadings.T  # (n_obs, n_var)
 
+    # TODO: Remove when R version bug was fixed.
+    # Mitigates bug in R version:
+    # If the total explained variance in the initialization step (SVD on data) is
+    # basically 1, floating point errors might lead to the computation of residual variances < 0
+    # This is not captured by the clipping procedure in R and makes tau = 1/residual variance collapse to large negative values
+    # Ultimatively, the fitting procedure collapses in these cases and all scores/loadings are essentially 0.
+    # Note that due to the multiple replicates for which each scenario is run, every scenario is still covered by
+    # at least one test.
     if np.allclose(r_reconstruction, 0, atol=1e-20):
         pytest.skip(reason="R values collapsed due to bug in R code")
 
