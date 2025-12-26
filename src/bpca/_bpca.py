@@ -171,19 +171,19 @@ class BPCA:
 
     @property
     def components_(self) -> np.ndarray:
-        """Principal axes in feature space (n_components_, n_features)"""
+        """Principal axes in feature space (``n_components_``, ``n_features``)."""
         self._check_is_fit()
         return self._components
 
     @property
     def explained_variance_ratio_(self) -> np.ndarray:
-        """Fraction of variance explained by each of the selected components (n_components_,)"""
+        """Fraction of variance explained by each of the selected components (``n_components_``,)."""
         self._check_is_fit()
         return self._explained_variance_ratio_
 
     @property
     def n_components_(self) -> int:
-        """Number of components (n_components_,)"""
+        """Number of components (``n_components_``,)."""
         return self._n_components
 
     @property
