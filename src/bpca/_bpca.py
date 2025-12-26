@@ -73,9 +73,9 @@ class BPCA:
 
     Citation
     --------
-    > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
-    > Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
-    > Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
+    - Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+    - Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
+    - Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
     """
 
     def __init__(
