@@ -2,6 +2,7 @@
 
 [![Tests][badge-tests]][tests]
 [![Integration Tests][badge-integration-tests]][integration-tests]
+[![codecov](https://codecov.io/gh/lucas-diedrich/bpca/graph/badge.svg?token=SIA7YSWCET)](https://codecov.io/gh/lucas-diedrich/bpca)
 [![Documentation][badge-docs]][documentation]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/lucas-diedrich/bpca/test.yaml?branch=main
