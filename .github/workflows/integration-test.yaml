@@ -25,7 +25,7 @@ jobs:
         with:
           micromamba-version: 'latest'
           init-shell: bash
-          generate-run-shell: true
+          generate-run-shell: false
 
       - name: Create R environment
         shell: micromamba-shell {0}
