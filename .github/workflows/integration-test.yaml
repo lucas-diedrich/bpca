@@ -42,7 +42,7 @@ jobs:
         run: |
           micromamba create -n bpca -y \
             -c conda-forge \
-            python>=3.11 \
+            python==3.12 \
             numpy \
             pytest
           micromamba run -n bpca pip install -e .
