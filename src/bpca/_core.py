@@ -56,12 +56,16 @@ class BPCAFit:
 
         iris_dataset = load_iris()
         X = iris_dataset["data"] # (n_obs, n_var)
-        bpca = BPCAFit(X=X)
+        bpca = BPCAFit(X=X, n_latent=None)
         bpca.fit()
+        usage = bpca.z # (n_components, n_latent)
+        weights = bpca.weights  # (n_var, n_latent)
 
     Citation
     --------
-    Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+    > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+    > Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
+    > Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
     """
 
     _IMPUTATION_OPTIONS = ("zero", "median")
@@ -161,8 +165,13 @@ class BPCAFit:
         self.X_imputed = np.where(self.nan_mask, 0, X)
 
         self.z = None
-        self.weights, residual_variance = self._pca(X=self.Xt, n_latent=self.n_latent)  # (n_features, n_latent), float
-        self.tau: float = 1 / np.clip(residual_variance, self.MIN_RESIDUAL_VARIANCE, self.MAX_RESIDUAL_VARIANCE)
+        # Pass raw data X to _pca (it handles imputation and centering internally, matching R)
+        self.weights, residual_variance = self._pca(X=self.X, n_latent=self.n_latent)  # (n_var, n_latent), float
+        # Match R: compute tau from residual variance, clipping to valid range.
+        # Fix bug in R: Use abs() to handle negative residual_variance (floating point noise when n_latent captures full variance).
+        self.tau: float = float(
+            np.clip(1.0 / np.abs(residual_variance), self.MIN_RESIDUAL_VARIANCE, self.MAX_RESIDUAL_VARIANCE)
+        )
 
         self.var = np.eye(self.n_latent)  # (n_latent, n_latent)
 
@@ -176,26 +185,30 @@ class BPCAFit:
     def _pca(self, X: np.ndarray, n_latent: int, strategy: str = "zero") -> tuple[np.ndarray, float]:
         """Run PCA on imputed data
 
+        Matches R pcaMethods behavior: impute missing values with 0, then compute
+        covariance using np.cov (which centers using mean of imputed data).
+
         Parameters
         ----------
-        x
-            (n_obs, n_var), mean-centered data
+        X
+            (n_obs, n_var). Expects raw, unimputed data.
         n_latent
             Number of latent dimensions to consider
 
         Returns
         -------
         weights, residual_variance
-            - Weights (n_latent, n_features)
+            - Weights (n_var, n_latent)
             - Residual unexplained variance by SVD
         """
-        X = _impute_missing(X, strategy=strategy)
-        covariance_matrix = (X.T @ X) / (X.shape[0] - 1)
+        # Match R behavior: impute first, then compute cov (which centers internally)
+        X_imputed = _impute_missing(X, strategy=strategy)
+        covariance_matrix = np.cov(X_imputed, rowvar=False)
         U, S, _ = np.linalg.svd(covariance_matrix, full_matrices=False)
 
         residual_variance = np.trace(covariance_matrix) - np.sum(S[:n_latent])
 
-        return U[:, :n_latent] * np.sqrt(S).T[:n_latent], residual_variance
+        return U[:, :n_latent] * np.sqrt(S[:n_latent]), residual_variance
 
     def _initialize_fit_procedure_parameters(self, max_iter: int, tolerance: float) -> None:
         """Initialize paramters of the fitting procedure
@@ -217,16 +230,19 @@ class BPCAFit:
     def fit(self):
         """Fit model"""
         converged = False
-        previous_tau = -np.inf
-        for n_iter in range(self.max_iter):  # noqa: B007
+        previous_tau = np.inf
+        for n_iter in range(self.max_iter):
             scores, T, trS, Rx = self._e_step()
             self._m_step(T, trS, Rx)
 
-            delta_tau = abs(np.log10(self.tau) - np.log10(previous_tau))
-            if delta_tau < self.tolerance:
-                converged = True
-                break
-            previous_tau = self.tau
+            # Match R: check convergence every 10 steps (step %% 10 == 0)
+            # R uses 1-based indexing, so step 10, 20, ... -> Python step 9, 19, ...
+            if n_iter % 10 == 9:
+                delta_tau = abs(np.log10(self.tau) - np.log10(previous_tau))
+                if delta_tau < self.tolerance:
+                    converged = True
+                    break
+                previous_tau = self.tau
 
         self.z = scores
 
@@ -367,10 +383,12 @@ class BPCAFit:
 
         self.weights = T @ Dw_inv
 
-        self.tau = float(self.n_var + 2 * self.GAMMA_TAU0 / self.n_obs) / (
+        # Note: self.mu @ self.mu.T produces a (1,1) array, so we need to extract scalar
+        mu_sq = float(self.mu @ self.mu.T)
+        self.tau = (self.n_var + 2 * self.GAMMA_TAU0 / self.n_obs) / (
             trS
             - np.trace(T.T @ self.weights)
-            + (self.mu @ self.mu.T * self.GAMMA_MU0 + 2 * self.GAMMA_TAU0 / self.BETA_TAU0) / self.n_obs
+            + (mu_sq * self.GAMMA_MU0 + 2 * self.GAMMA_TAU0 / self.BETA_TAU0) / self.n_obs
         )
 
         self.var = Dw_inv * self.n_var / self.n_obs
@@ -379,9 +397,6 @@ class BPCAFit:
             + np.diag(self.var)
             + 2 * self.GAMMA_ALPHA0 / self.BETA_ALPHA0
         )
-
-    def _convergence_criterium(self):
-        """Convergence criterium"""
 
     @property
     def n_iter(self) -> int:
