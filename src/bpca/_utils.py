@@ -1,6 +1,33 @@
 """Utility module"""
 
+from typing import Literal
+
 import numpy as np
+
+
+def impute_missing(x: np.ndarray, strategy: Literal["median", "zero"] = "zero") -> np.ndarray:
+    """Impute missing values
+
+    Parameters
+    ----------
+    x
+        Matrix (n_obs, n_vars) with missing values
+    strategy
+        Imputation strategy
+            - `zero`: Impute zeros. Strategy in `pcaMethods`
+            - `median`: Impute feature-wise median of non-missing observations
+    """
+    missing_mask = np.isnan(x)
+    if not missing_mask.any():
+        return x
+
+    if strategy == "median":
+        feature_medians = np.nanmedian(x, axis=0, keepdims=True)
+        return np.where(missing_mask, feature_medians, x)
+    elif strategy == "zero":
+        return np.where(missing_mask, 0, x)
+    else:
+        raise ValueError(f"`strategy` must be one of ('zero', 'median'), not {strategy}")
 
 
 def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.ndarray) -> np.ndarray:

@@ -1,38 +1,14 @@
 """Core algorithm"""
 
 import warnings
-from typing import Literal
 
 import numpy as np
+
+from ._utils import impute_missing
 
 
 class ConvergenceWarning(Warning):
     """Algorithm did not converge"""
-
-
-def _impute_missing(x: np.ndarray, strategy: Literal["median", "zero"] = "zero") -> np.ndarray:
-    """Impute missing values
-
-    Parameters
-    ----------
-    x
-        Matrix (n_obs, n_vars) with missing values
-    strategy
-        Imputation strategy
-            - `zero`: Impute zeros. Strategy in `pcaMethods`
-            - `median`: Impute feature-wise median of non-missing observations
-    """
-    missing_mask = np.isnan(x)
-    if not missing_mask.any():
-        return x
-
-    if strategy == "median":
-        feature_medians = np.nanmedian(x, axis=0, keepdims=True)
-        return np.where(missing_mask, feature_medians, x)
-    elif strategy == "zero":
-        return np.where(missing_mask, 0, x)
-    else:
-        raise ValueError(f"`strategy` must be one of ('zero', 'median'), not {strategy}")
 
 
 class BPCAFit:
@@ -63,9 +39,9 @@ class BPCAFit:
 
     Citation
     --------
-    > Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
-    > Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
-    > Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
+    - Bishop, C. Bayesian PCA. in Advances in Neural Information Processing Systems vol. 11 (MIT Press, 1998).
+    - Oba, S. et al. A Bayesian missing value estimation method for gene expression profile data. Bioinformatics 19, 2088 - 2096 (2003).
+    - Stacklies, W., Redestig, H., Scholz, M., Walther, D. & Selbig, J. pcaMethods—a bioconductor package providing PCA methods for incomplete data. Bioinformatics 23, 1164 - 1167 (2007).
     """
 
     _IMPUTATION_OPTIONS = ("zero", "median")
@@ -202,7 +178,7 @@ class BPCAFit:
             - Residual unexplained variance by SVD
         """
         # Match R behavior: impute first, then compute cov (which centers internally)
-        X_imputed = _impute_missing(X, strategy=strategy)
+        X_imputed = impute_missing(X, strategy=strategy)
         covariance_matrix = np.cov(X_imputed, rowvar=False)
         U, S, _ = np.linalg.svd(covariance_matrix, full_matrices=False)
 
