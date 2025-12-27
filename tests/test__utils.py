@@ -1,10 +1,52 @@
 """Test utilities module"""
 
+from typing import Literal
+
 import numpy as np
 import pytest
 from sklearn.decomposition import PCA
 
-from bpca._utils import compute_variance_explained
+from bpca._utils import compute_variance_explained, impute_missing
+
+
+class TestImputeMissing:
+    @pytest.fixture
+    def complete_array(self) -> np.ndarray:
+        return np.arange(20, dtype=np.float64).reshape(5, 4)
+
+    @pytest.fixture
+    def nan_array(self, complete_array: np.ndarray) -> dict[str, np.ndarray]:
+        nan_array = complete_array.copy()
+        median_imputed_array = complete_array.copy()
+        zero_imputed_array = complete_array.copy()
+
+        # (Replace 1 with np.nan)
+        nan_array[0, 1] = np.nan
+
+        # Replace 1 with feature-wise median: [np.nan, 5, 9, 13, 17] -> (11)
+        median_imputed_array[0, 1] = 11
+
+        # Replace 1 with 0:
+        zero_imputed_array[0, 1] = 0
+
+        return {"X": nan_array, "median": median_imputed_array, "zero": zero_imputed_array}
+
+    @pytest.mark.parametrize("strategy", ["median", "zero"])
+    def test_impute_missing(self, nan_array: dict[str, np.ndarray], strategy: Literal["median", "zero"]) -> None:
+        X = nan_array["X"]
+
+        result = impute_missing(X, strategy=strategy)
+
+        assert np.array_equal(result, nan_array[strategy])
+
+    @pytest.mark.parametrize("strategy", ["invalid"])
+    def test_impute_missing__raises(
+        self, nan_array: dict[str, np.ndarray], strategy: Literal["median", "zero"]
+    ) -> None:
+        X = nan_array["X"]
+
+        with pytest.raises(ValueError, match="`strategy` must be one of"):
+            _ = impute_missing(X, strategy=strategy)
 
 
 class TestComputeVarianceExplained:
