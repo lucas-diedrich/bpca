@@ -35,15 +35,15 @@ Please refer to the [documentation][], in particular, the [API documentation][].
 
 You need to have Python 3.11 or newer installed on your system.
 
-<!--
-1) Install the latest release of `bpca` from [PyPI][]:
+
+1. Install the latest release of `bpca` from [PyPI][]:
 
 ```bash
 pip install bpca
 ```
--->
 
-1. Install the latest development version:
+
+2. Or Install the latest development version:
 
 ```bash
 pip install git+https://github.com/lucas-diedrich/bpca.git@main
