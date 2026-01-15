@@ -82,3 +82,16 @@ class TestComputeVarianceExplained:
         X, usage, loadings, explained_variance = array_with_nan
         result = compute_variance_explained(X, usage, loadings)
         assert np.allclose(result, explained_variance)
+
+    def test_compute_variance_explained_zero_contributions(self) -> None:
+        """When contributions sum to zero, warn and return zeros."""
+        # Create degenerate case: components that don't explain any variance
+        X = np.zeros((10, 5))
+        usage = np.zeros((10, 2))
+        loadings = np.zeros((2, 5))
+
+        with pytest.warns(UserWarning, match="Component contributions sum to zero"):
+            result = compute_variance_explained(X, usage, loadings)
+
+        assert result.shape == (2,)
+        assert np.all(result == 0)

@@ -14,9 +14,18 @@ class TestBPCAInit:
     @pytest.mark.parametrize("tolerance", [1e-4, 0.1, 1e-6], ids=("default", "non-default-higher", "non-default-lower"))
     @pytest.mark.parametrize("sort_components", [True, False], ids=("sort-true", "sort-false"))
     def test_init_stores_parameters(
-        self, n_components: int | None, max_iter: int, tolerance: float, sort_components: bool
+        self,
+        n_components: int | None,
+        max_iter: int,
+        tolerance: float,
+        sort_components: bool,
     ) -> None:
-        bpca = BPCA(n_components=n_components, max_iter=max_iter, tolerance=tolerance, sort_components=sort_components)
+        bpca = BPCA(
+            n_components=n_components,
+            max_iter=max_iter,
+            tolerance=tolerance,
+            sort_components=sort_components,
+        )
 
         assert bpca._n_components == n_components
         assert bpca._max_iter == max_iter
