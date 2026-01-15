@@ -39,11 +39,13 @@ class BPCA:
         n_components: int | None = None,
         max_iter: int = 1000,
         tolerance: float = 1e-4,
+        sort_components: bool = False,
     ):
         """Initialize Bayesian principal component analysis"""
         self._n_components = n_components
         self._max_iter = max_iter
         self._tolerance = tolerance
+        self._sort_components = sort_components
 
         self._is_fit = False
 
@@ -76,6 +78,9 @@ class BPCA:
         self._n_iter = bpca.n_iter
 
         self._explained_variance_ratio_ = compute_variance_explained(X=X, usage=self._usage, loadings=self._components)
+
+        if self._sort_components:
+            self._sort_by_explained_variance()
 
         self._is_fit = True
 
@@ -124,6 +129,14 @@ class BPCA:
         """
         if not self._is_fit:
             raise RuntimeError("Fit model first.")
+
+    def _sort_by_explained_variance(self) -> None:
+        """Sort all component arrays by explained variance in descending order."""
+        sort_idx = np.argsort(self._explained_variance_ratio_)[::-1]
+        self._explained_variance_ratio_ = self._explained_variance_ratio_[sort_idx]
+        self._alpha = self._alpha[sort_idx]
+        self._components = self._components[sort_idx, :]
+        self._usage = self._usage[:, sort_idx]
 
     @property
     def components_(self) -> np.ndarray:
