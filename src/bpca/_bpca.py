@@ -159,3 +159,9 @@ class BPCA:
         r"""Estimated variance :math:`\sigma^2` by EM algorithm."""
         self._check_is_fit()
         return self._tau
+
+    @property
+    def mu(self) -> np.ndarray:
+        r"""Estimated feature-wise mean :math:`\mu` by EM algorithm."""
+        self._check_is_fit()
+        return self._mu.reshape(-1)

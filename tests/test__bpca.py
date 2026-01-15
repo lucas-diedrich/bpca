@@ -142,7 +142,7 @@ class TestBPCAProperties:
 
     @pytest.mark.parametrize(
         "property_name",
-        ["components_", "explained_variance_ratio_", "n_iter", "alpha", "tau"],
+        ["components_", "explained_variance_ratio_", "n_iter", "alpha", "tau", "mu"],
     )
     def test_properties_raise_if_not_fit(self, unfitted_bpca: BPCA, property_name: str) -> None:
         with pytest.raises(RuntimeError, match="Fit model first"):
@@ -185,3 +185,9 @@ class TestBPCAProperties:
         bpca, _ = fitted_bpca
 
         assert bpca.tau > 0
+
+    def test_mu_accessible(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
+        """Test that the mu parameter is accessible and has the expected shape"""
+        bpca, X = fitted_bpca
+
+        assert bpca.mu.shape == (X.shape[1],)
