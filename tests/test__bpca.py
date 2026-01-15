@@ -9,17 +9,19 @@ from bpca._bpca import BPCA
 class TestBPCAInit:
     """Test BPCA initialization"""
 
-    @pytest.mark.parametrize(
-        ("n_components", "max_iter", "tolerance"),
-        [(None, 1000, 1e-4), (5, 500, 1e-3), (10, 100, 0.1)],
-        ids=("default", "custom-1", "custom-2"),
-    )
-    def test_init_stores_parameters(self, n_components: int | None, max_iter: int, tolerance: float) -> None:
-        bpca = BPCA(n_components=n_components, max_iter=max_iter, tolerance=tolerance)
+    @pytest.mark.parametrize("n_components", [None, 2], ids=("default", "non-default-2"))
+    @pytest.mark.parametrize("max_iter", [1000, 500], ids=("default", "non-default-500"))
+    @pytest.mark.parametrize("tolerance", [1e-4, 0.1, 1e-6], ids=("default", "non-default-higher", "non-default-lower"))
+    @pytest.mark.parametrize("sort_components", [True, False], ids=("sort-true", "sort-false"))
+    def test_init_stores_parameters(
+        self, n_components: int | None, max_iter: int, tolerance: float, sort_components: bool
+    ) -> None:
+        bpca = BPCA(n_components=n_components, max_iter=max_iter, tolerance=tolerance, sort_components=sort_components)
 
         assert bpca._n_components == n_components
         assert bpca._max_iter == max_iter
         assert bpca._tolerance == tolerance
+        assert bpca._sort_components == sort_components
 
 
 class TestBPCAFit:
@@ -190,3 +192,44 @@ class TestBPCAProperties:
         bpca, X = fitted_bpca
 
         assert bpca.mu.shape == (X.shape[1],)
+
+
+class TestBPCASortComponents:
+    """Test BPCA sort_components parameter"""
+
+    @pytest.fixture
+    def array(self) -> np.ndarray:
+        """(n_obs=50, n_var=10) array with latent structure"""
+        rng = np.random.default_rng(seed=42)
+        usage = rng.normal(size=(50, 5))
+        loadings = rng.normal(size=(5, 10))
+        return usage @ loadings
+
+    def test_sort_components_false_preserves_order(self, array: np.ndarray) -> None:
+        """Default behavior: components not sorted by explained variance."""
+        bpca = BPCA(n_components=3, sort_components=False, max_iter=100)
+        bpca.fit(array)
+
+        assert bpca.components_.shape == (3, 10)
+        assert bpca.explained_variance_ratio_.shape == (3,)
+
+    def test_sort_components_true_sorts_by_variance(self, array: np.ndarray) -> None:
+        """When sort_components=True, components sorted by explained variance descending."""
+        bpca = BPCA(n_components=3, sort_components=True, max_iter=100)
+        bpca.fit(array)
+
+        evr = bpca.explained_variance_ratio_
+        assert np.all(evr[:-1] >= evr[1:]), "Explained variance should be in descending order"
+
+    def test_sort_components_reconstruction_invariant(self, array: np.ndarray) -> None:
+        """Sorting should not affect reconstruction quality."""
+        bpca_unsorted = BPCA(n_components=3, sort_components=False, max_iter=100)
+        bpca_sorted = BPCA(n_components=3, sort_components=True, max_iter=100)
+
+        usage_unsorted = bpca_unsorted.fit_transform(array)
+        usage_sorted = bpca_sorted.fit_transform(array)
+
+        recon_unsorted = usage_unsorted @ bpca_unsorted.components_
+        recon_sorted = usage_sorted @ bpca_sorted.components_
+
+        np.testing.assert_allclose(recon_unsorted, recon_sorted, atol=1e-10)
