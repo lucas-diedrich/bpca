@@ -11,15 +11,15 @@ the [scientific Python tutorials][], or the [scanpy developer guide][].
 [scientific Python tutorials]: https://learn.scientific-python.org/development/tutorials/
 [scanpy developer guide]: https://scanpy.readthedocs.io/en/latest/dev/index.html
 
-:::{tip} The *hatch* project manager
+:::{tip} The _hatch_ project manager
 
 We highly recommend to familiarize yourself with [`hatch`][hatch].
 Hatch is a Python project manager that
 
-- manages virtual environments, separately for development, testing and building the documentation.
-  Separating the environments is useful to avoid dependency conflicts.
-- allows to run tests locally in different environments (e.g. different python versions)
-- allows to run tasks defined in `pyproject.toml`, e.g. to build documentation.
+-   manages virtual environments, separately for development, testing and building the documentation.
+    Separating the environments is useful to avoid dependency conflicts.
+-   allows to run tests locally in different environments (e.g. different python versions)
+-   allows to run tasks defined in `pyproject.toml`, e.g. to build documentation.
 
 While the project is setup with `hatch` in mind,
 it is still possible to use different tools to manage dependencies, such as `uv` or `pip`.
@@ -33,8 +33,7 @@ it is still possible to use different tools to manage dependencies, such as `uv`
 In addition to the packages needed to _use_ this package,
 you need additional python packages to [run tests](#writing-tests) and [build the documentation](#docs-building).
 
-:::::{tabs}
-::::{group-tab} Hatch
+### Development with hatch
 
 On the command line, you typically interact with hatch through its command line interface (CLI).
 Running one of the following commands will automatically resolve the environments for testing and
@@ -44,6 +43,8 @@ building the documentation in the background:
 hatch test  # defined in the table [tool.hatch.envs.hatch-test] in pyproject.toml
 hatch run docs:build  # defined in the table [tool.hatch.envs.docs]
 ```
+
+<details>
 
 When using an IDE such as VS Code,
 you’ll have to point the editor at the paths to the virtual environments manually.
@@ -92,9 +93,9 @@ Choose `Enter Interpreter Path` and paste the path to the virtual environment fr
 
 In this future, this may become easier through a hatch vscode extension.
 
-::::
+</details>
 
-::::{group-tab} uv
+### Development with uv
 
 A popular choice for managing virtual environments is [uv][].
 The main disadvantage compared to hatch is that it supports only a single environment per project at a time,
@@ -102,6 +103,10 @@ which requires you to mix the dependencies for running tests and building docs.
 This can have undesired side-effects,
 such as requiring to install a lower version of a library your project depends on,
 only because an outdated sphinx plugin pins an older version.
+
+<details>
+
+<summary>Details</summary>
 
 To initalize a virtual environment in the `.venv` directory of your project, simply run
 
@@ -111,13 +116,16 @@ uv sync --all-extras
 
 The `.venv` directory is typically automatically discovered by IDEs such as VS Code.
 
-::::
+</details>
 
-::::{group-tab} Pip
+### Development with pip
 
 Pip is nowadays mostly superseded by environment manager such as [hatch][].
 However, for the sake of completeness, and since it’s ubiquitously available,
 we describe how you can manage environments manually using `pip`:
+
+<details>
+<summary>Details</summary>
 
 ```bash
 python3 -m venv .venv
@@ -127,8 +135,7 @@ pip install -e ".[dev,test,doc]"
 
 The `.venv` directory is typically automatically discovered by IDEs such as VS Code.
 
-::::
-:::::
+</details>
 
 [hatch environments]: https://hatch.pypa.io/latest/tutorials/environment/basic-usage/
 [uv]: https://docs.astral.sh/uv/
@@ -165,6 +172,7 @@ Consider enabling this option for [ruff][ruff-editors] and [biome][biome-editors
 [pre-commit]: https://pre-commit.com/
 [pre-commit.ci]: https://pre-commit.ci/
 [ruff-editors]: https://docs.astral.sh/ruff/integrations/
+
 [biome-editors]: https://biomejs.dev/guides/integrate-in-editor/
 
 (writing-tests)=
@@ -184,8 +192,8 @@ hatch env find hatch-test  # list all possible test environment paths
 
 Alternatively, you can run all tests from the command line by executing
 
-:::::{tabs}
-::::{group-tab} Hatch
+<details>
+<summary>hatch</summary>
 
 ```bash
 hatch test  # test with the highest supported Python version
@@ -193,25 +201,26 @@ hatch test  # test with the highest supported Python version
 hatch test --all  # test with all supported Python versions
 ```
 
-::::
+</details>
 
-::::{group-tab} uv
+<details>
+<summary>uv</summary>
 
 ```bash
 uv run pytest
 ```
 
-::::
+</details>
 
-::::{group-tab} Pip
+<details>
+<summary>shell</summary>
 
 ```bash
 source .venv/bin/activate
 pytest
 ```
 
-::::
-:::::
+</details>
 
 in the root of the repository.
 
@@ -260,11 +269,11 @@ This will automatically create a git tag and trigger a Github workflow that crea
 Please write documentation for new or changed features and use-cases.
 This project uses [sphinx][] with the following features:
 
-- The [myst][] extension allows to write documentation in markdown/Markedly Structured Text
-- [Numpy-style docstrings][numpydoc] (through the [napoloen][numpydoc-napoleon] extension).
-- Jupyter notebooks as tutorials through [myst-nb][] (See [Tutorials with myst-nb](#tutorials-with-myst-nb-and-jupyter-notebooks))
-- [sphinx-autodoc-typehints][], to automatically reference annotated input and output types
-- Citations (like {cite:p}`Virshup_2023`) can be included with [sphinxcontrib-bibtex](https://sphinxcontrib-bibtex.readthedocs.io/)
+-   The [myst][] extension allows to write documentation in markdown/Markedly Structured Text
+-   [Numpy-style docstrings][numpydoc] (through the [napoloen][numpydoc-napoleon] extension).
+-   Jupyter notebooks as tutorials through [myst-nb][] (See [Tutorials with myst-nb](#tutorials-with-myst-nb-and-jupyter-notebooks))
+-   [sphinx-autodoc-typehints][], to automatically reference annotated input and output types
+-   Citations (like {cite:p}`Virshup_2023`) can be included with [sphinxcontrib-bibtex](https://sphinxcontrib-bibtex.readthedocs.io/)
 
 See scanpy’s {doc}`scanpy:dev/documentation` for more information on how to write your own.
 
@@ -288,26 +297,29 @@ please check out [this feature request][issue-render-notebooks] in the `cookiecu
 
 #### Hints
 
-- If you refer to objects from other packages, please add an entry to `intersphinx_mapping` in `docs/conf.py`.
-  Only if you do so can sphinx automatically create a link to the external documentation.
-- If building the documentation fails because of a missing link that is outside your control,
-  you can add an entry to the `nitpick_ignore` list in `docs/conf.py`
+-   If you refer to objects from other packages, please add an entry to `intersphinx_mapping` in `docs/conf.py`.
+    Only if you do so can sphinx automatically create a link to the external documentation.
+-   If building the documentation fails because of a missing link that is outside your control,
+    you can add an entry to the `nitpick_ignore` list in `docs/conf.py`
 
 (docs-building)=
 
 ### Building the docs locally
 
-:::::{tabs}
-::::{group-tab} Hatch
+Depending on your development workflow, you can use `hatch`, `uv` or vanilla `python` to build the docs.
+
+<details>
+<summary>Hatch</summary>
 
 ```bash
 hatch run docs:build
 hatch run docs:open
 ```
 
-::::
+</details>
 
-::::{group-tab} uv
+<details>
+<summary>uv</summary>
 
 ```bash
 cd docs
@@ -315,9 +327,10 @@ uv run sphinx-build -M html . _build -W
 (xdg-)open _build/html/index.html
 ```
 
-::::
+</details>
 
-::::{group-tab} Pip
+<details>
+<summary>pip/Python</summary>
 
 ```bash
 source .venv/bin/activate
@@ -326,5 +339,4 @@ sphinx-build -M html . _build -W
 (xdg-)open _build/html/index.html
 ```
 
-::::
-:::::
+</details>
