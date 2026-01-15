@@ -39,7 +39,7 @@ class BPCA:
         n_components: int | None = None,
         max_iter: int = 1000,
         tolerance: float = 1e-4,
-        sort_components: bool = False,
+        sort_components: bool = True,
     ):
         """Initialize Bayesian principal component analysis"""
         self._n_components = n_components
