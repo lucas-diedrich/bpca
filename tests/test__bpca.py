@@ -9,11 +9,10 @@ from bpca._bpca import BPCA
 class TestBPCAInit:
     """Test BPCA initialization"""
 
-    @pytest.mark.parametrize(
-        ("n_components", "max_iter", "tolerance", "sort_components"),
-        [(None, 1000, 1e-4, False), (5, 500, 1e-3, True), (10, 100, 0.1, False)],
-        ids=("default", "custom-1", "custom-2"),
-    )
+    @pytest.mark.parametrize("n_components", [None, 2], ids=("default", "non-default-2"))
+    @pytest.mark.parametrize("max_iter", [1000, 500], ids=("defaut", "non-default-500"))
+    @pytest.mark.parametrize("tolerance", [1e-4, 0.1, 1e-6], ids=("default", "non-default-higher", "non-default-lower"))
+    @pytest.mark.parametrize("sort_components", [True, False], ids=("sort-true", "sort-false"))
     def test_init_stores_parameters(
         self, n_components: int | None, max_iter: int, tolerance: float, sort_components: bool
     ) -> None:
