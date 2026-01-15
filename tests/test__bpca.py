@@ -185,3 +185,9 @@ class TestBPCAProperties:
         bpca, _ = fitted_bpca
 
         assert bpca.tau > 0
+
+    def test_mu_accessible(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
+        """Test that the mu parameter is accessible and has the expected shape"""
+        bpca, X = fitted_bpca
+
+        assert bpca.mu.shape == (X.shape[1],)
