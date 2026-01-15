@@ -1,5 +1,6 @@
 """Utility module"""
 
+import warnings
 from typing import Literal
 
 import numpy as np
@@ -47,8 +48,13 @@ def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.nd
 
     Returns
     -------
-    tuple[np.ndarray, np.ndarray]
-        Variance explained per component (sorted descending) and sort order
+    np.ndarray
+        Variance explained per component
+
+    Raises
+    ------
+    UserWarning
+        If component contributions sum to zero.
     """
     X_centered = X - np.nanmean(X, axis=0)
     total_ss = np.nansum(np.square(X_centered))
@@ -72,4 +78,15 @@ def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.nd
         # Raw contribution of component k
         contributions[k] = residual_without_k - full_residual_ss
 
-    return contributions / np.nansum(contributions) * total_r2
+    # Handle zero contributions edge case (zero division)
+    contribution_sum = np.nansum(contributions)
+    if contribution_sum == 0:
+        warnings.warn(
+            "Component contributions sum to zero. Returning zeros for explained variance. "
+            "This may indicate the data has no meaningful structure.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return np.zeros(n_components)
+
+    return contributions / contribution_sum * total_r2
