@@ -162,11 +162,6 @@ class BPCA:
 
     @property
     def mu(self) -> np.ndarray:
-        r"""Estimated feature-wise mean :math:`\mu` by EM algorithm
-
-        Returns
-        -------
-        Feature-wise mean (n_var,)
-        """
+        r"""Estimated feature-wise mean :math:`\mu` by EM algorithm."""
         self._check_is_fit()
-        return self._mu.squeeze()
+        return self._mu.reshape(-1)
