@@ -142,7 +142,7 @@ class TestBPCAProperties:
 
     @pytest.mark.parametrize(
         "property_name",
-        ["components_", "explained_variance_ratio_", "n_iter", "alpha", "tau"],
+        ["components_", "explained_variance_ratio_", "n_iter", "alpha", "tau", "mu"],
     )
     def test_properties_raise_if_not_fit(self, unfitted_bpca: BPCA, property_name: str) -> None:
         with pytest.raises(RuntimeError, match="Fit model first"):
