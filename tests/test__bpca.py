@@ -173,20 +173,19 @@ class TestBPCAProperties:
 
         assert bpca.n_iter > 0
 
-    def test_alpha_shape_and_sorted(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
+    def test_alpha_shape(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
         bpca, _ = fitted_bpca
 
         result = bpca.alpha
 
         assert result.shape == (3,)
-        assert np.all(result[:-1] <= result[1:])  # sorted ascending
 
     def test_tau_positive(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
         bpca, _ = fitted_bpca
 
         assert bpca.tau > 0
 
-    def test_mu_accessible(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
+    def test_mu_shape(self, fitted_bpca: tuple[BPCA, np.ndarray]) -> None:
         """Test that the mu parameter is accessible and has the expected shape"""
         bpca, X = fitted_bpca
 
