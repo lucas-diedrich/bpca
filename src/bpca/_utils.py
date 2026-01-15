@@ -78,9 +78,9 @@ def compute_variance_explained(X: np.ndarray, usage: np.ndarray, loadings: np.nd
         # Raw contribution of component k
         contributions[k] = residual_without_k - full_residual_ss
 
-    # Handle zero contributions edge case
+    # Handle zero contributions edge case (zero division)
     contribution_sum = np.nansum(contributions)
-    if contribution_sum == 0 or np.isclose(contribution_sum, 0):
+    if contribution_sum == 0:
         warnings.warn(
             "Component contributions sum to zero. Returning zeros for explained variance. "
             "This may indicate the data has no meaningful structure.",
