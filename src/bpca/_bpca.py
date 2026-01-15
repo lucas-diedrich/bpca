@@ -152,7 +152,7 @@ class BPCA:
     def alpha(self) -> np.ndarray:
         r"""Estimated regularization strength :math:`\alpha^2` by EM algorithm."""
         self._check_is_fit()
-        return np.sort(self._alpha)
+        return self._alpha
 
     @property
     def tau(self) -> float:
